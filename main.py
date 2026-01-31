@@ -35,7 +35,6 @@ logger = logging.getLogger(__name__)
 # --------------------------------------------------
 # BOT INITIALIZATION
 # --------------------------------------------------
-# Ensure api_id is an integer
 try:
     API_ID_INT = int(api_id)
 except ValueError:
@@ -96,7 +95,6 @@ async def process_pwwp_subject(session, subject, batch_id, batch_name, zipf, jso
     subject_name = subject.get("subject", "Unknown").replace("/", "-")
     subject_id = subject.get("_id")
     
-    # Initialize JSON structure if not exists
     if batch_name not in json_data:
         json_data[batch_name] = {}
     json_data[batch_name][subject_name] = {}
@@ -115,17 +113,14 @@ async def process_pwwp_subject(session, subject, batch_id, batch_name, zipf, jso
         else:
             break
     
-    # Process Chapters
     for chapter in all_chapters:
         c_name = chapter.get("name", "Unknown").replace("/", "-")
         zipf.writestr(f"{subject_name}/{c_name}/", "")
         json_data[batch_name][subject_name][c_name] = {}
         
-        # Process Content Types for each chapter
         content_types = ['videos', 'notes', 'DppNotes', 'DppVideos']
         
         for c_type in content_types:
-            # Fetch content items
             items = []
             pg = 1
             while True:
@@ -139,10 +134,8 @@ async def process_pwwp_subject(session, subject, batch_id, batch_name, zipf, jso
                 else:
                     break
             
-            # Extract URLs from items
             extracted_links = []
             for item in items:
-                # Get detailed schedule info
                 s_url = f"https://api.penpencil.co/v1/batches/{batch_id}/subject/{subject_id}/schedule/{item['_id']}/schedule-details"
                 s_data = await fetch_data(session, s_url, headers=headers)
                 
@@ -163,11 +156,10 @@ async def process_pwwp_subject(session, subject, batch_id, batch_name, zipf, jso
                                     extracted_links.append(f"{h.get('topic')}:{url}")
 
             if extracted_links:
-                final_text = "\n".join(extracted_links[::-1]) # Reverse order
+                final_text = "\n".join(extracted_links[::-1])
                 zipf.writestr(f"{subject_name}/{c_name}/{c_type}.txt", final_text)
                 json_data[batch_name][subject_name][c_name][c_type] = extracted_links
                 
-                # Add to all urls list
                 if subject_name not in all_subject_urls:
                     all_subject_urls[subject_name] = []
                 all_subject_urls[subject_name].extend(extracted_links)
@@ -183,17 +175,18 @@ async def run_pwwp_extraction(client: Client, m: Message, user_id: int):
         await editable.edit("**Timeout.**")
         return
 
+    # RESTORED FULL HEADERS TO FIX 401 ERROR
     headers = {
         'client-id': '5eb393ee95fab7468a79d189',
+        'client-version': '1910',
         'randomid': '72012511-256c-4e1c-b4c7-29d67136af37',
         'client-type': 'WEB',
         'content-type': 'application/json',
+        'user-agent': 'Mozilla/5.0 (Linux; Android 12; M2101K6P) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Mobile Safari/537.36',
     }
 
     async with aiohttp.ClientSession() as session:
-        # Authentication Logic
         if raw_input.isdigit() and len(raw_input) == 10:
-            # OTP FLOW
             try:
                 await session.post("https://api.penpencil.co/v1/users/get-otp?smsType=0", 
                                  json={"username": raw_input, "countryCode": "+91", "organizationId": "5eb393ee95fab7468a79d189"}, headers=headers)
@@ -217,9 +210,9 @@ async def run_pwwp_extraction(client: Client, m: Message, user_id: int):
         else:
             access_token = raw_input
 
-        headers['authorization'] = f"Bearer {access_token}"
+        # Update headers with token
+        headers['Authorization'] = f"Bearer {access_token}"
         
-        # Batch Selection
         await editable.edit("**Enter Batch Name to Search:**")
         try:
             batch_input = await client.listen(chat_id=m.chat.id, user_id=user_id, timeout=120)
@@ -230,6 +223,12 @@ async def run_pwwp_extraction(client: Client, m: Message, user_id: int):
 
         search_url = f"https://api.penpencil.co/v3/batches/search?name={batch_search}"
         data = await fetch_data(session, search_url, headers=headers)
+        
+        # FIX: Check if data exists before using .get()
+        if not data:
+            await editable.edit("**Login Failed or API Error (401). Check your Token.**")
+            return
+
         courses = data.get("data", [])
         
         if not courses:
@@ -255,10 +254,14 @@ async def run_pwwp_extraction(client: Client, m: Message, user_id: int):
         
         await editable.edit(f"**Extracting {batch_name}... Please wait.**")
         
-        # Extraction
         try:
             url = f"https://api.penpencil.co/v3/batches/{batch_id}/details"
             details = await fetch_data(session, url, headers=headers)
+            
+            if not details: 
+                await editable.edit("**Failed to get batch details.**")
+                return
+
             subjects = details.get("data", {}).get("subjects", [])
             
             json_data = {batch_name: {}}
@@ -268,7 +271,6 @@ async def run_pwwp_extraction(client: Client, m: Message, user_id: int):
                 tasks = [process_pwwp_subject(session, s, batch_id, batch_name, zipf, json_data, all_subject_urls, headers) for s in subjects]
                 await asyncio.gather(*tasks)
             
-            # Send Files
             await editable.delete()
             if os.path.exists(f"{clean_name}.zip"):
                 await m.reply_document(document=f"{clean_name}.zip", caption=f"**{batch_name}**")
@@ -299,11 +301,9 @@ async def get_cpwp_content_recursive(session, headers, batch_token, folder_id=0)
     tasks = []
 
     for content in contents:
-        # If Folder, Recurse
         if content['contentType'] == 1:
             tasks.append(get_cpwp_content_recursive(session, headers, batch_token, content['id']))
         else:
-            # Extract URL
             url = content.get('url') or content.get('thumbnailUrl')
             name = content.get('name', 'Unknown')
             if url:
@@ -371,7 +371,6 @@ async def run_cpwp_extraction(client: Client, m: Message, user_id: int):
             await inp.delete()
         except: return
 
-        # Get Batch Token
         batch_headers = {'tutorWebsiteDomain': f'https://{org_code}.courses.store', 'Api-Version': '22'}
         info_url = f"https://api.classplusapp.com/v2/course/preview/org/info?courseId={selected['id']}"
         async with session.get(info_url, headers=batch_headers) as resp:
