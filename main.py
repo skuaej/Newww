@@ -1,11 +1,7 @@
-
-API_ID = 12345678        # Your API ID (Integer, no quotes)
-API_HASH = "your_hash"   # Your API Hash (String)
-BOT_TOKEN = "your_token" # Your Bot Token (String)
-AUTH_USERS = [7890781002, 6373737837] # Authorized User IDs
-
-Step 2: The Main Script (bot.py)
-Copy this exact code into your main file.
+It looks like you accidentally pasted my instructions (text like "Step 2: The Main Script...") inside your Python file. The computer thinks this text is code, which causes the crash.
+You must delete EVERYTHING in your main.py file and paste ONLY the code block below.
+Do not paste any text that is outside of the grey box.
+📄 Copy this into main.py
 import asyncio
 import aiohttp
 import json
@@ -15,16 +11,15 @@ import re
 import time
 import logging
 import random
-from typing import Dict, List, Any, Tuple
+from typing import Dict, List, Any
 from datetime import datetime
 
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message
 from pyromod import listen
-from pyromod.exceptions.listener_timeout import ListenerTimeout
 
-# Import credentials
-from config import API_ID, API_HASH, BOT_TOKEN, AUTH_USERS
+# Import credentials from config.py
+from config import api_id, api_hash, bot_token, auth_users
 
 # --------------------------------------------------
 # LOGGING SETUP
@@ -35,11 +30,18 @@ logger = logging.getLogger(__name__)
 # --------------------------------------------------
 # BOT INITIALIZATION
 # --------------------------------------------------
+# Ensure api_id is an integer
+try:
+    API_ID_INT = int(api_id)
+except ValueError:
+    logger.error("API_ID in config.py must be a number!")
+    exit(1)
+
 bot = Client(
     "pw_cp_bot",
-    api_id=int(API_ID),
-    api_hash=API_HASH,
-    bot_token=BOT_TOKEN
+    api_id=API_ID_INT,
+    api_hash=api_hash,
+    bot_token=bot_token
 )
 
 IMAGE_LIST = [
@@ -51,7 +53,7 @@ IMAGE_LIST = [
 ]
 
 # --------------------------------------------------
-# HELPER FUNCTIONS (NETWORK)
+# HELPER FUNCTIONS
 # --------------------------------------------------
 async def fetch_data(session: aiohttp.ClientSession, url: str, headers: Dict = None, params: Dict = None, data: Dict = None, method: str = 'GET') -> Any:
     max_retries = 3
@@ -71,7 +73,7 @@ async def fetch_data(session: aiohttp.ClientSession, url: str, headers: Dict = N
 # START HANDLER
 # --------------------------------------------------
 @bot.on_message(filters.command(["start"]))
-async def start_handler(bot: Client, message: Message):
+async def start_handler(client, message: Message):
     keyboard = [
         [InlineKeyboardButton("🚀 Physics Wallah 🚀", callback_data="pwwp")],
         [InlineKeyboardButton("📘 Classplus 📘", callback_data="cpwp")]
@@ -85,76 +87,15 @@ async def start_handler(bot: Client, message: Message):
 # --------------------------------------------------
 # PHYSICS WALLAH (PW) LOGIC
 # --------------------------------------------------
-async def process_pwwp_chapter_content(session, chapter_id, batch_id, subject_id, schedule_id, content_type, headers):
-    url = f"https://api.penpencil.co/v1/batches/{batch_id}/subject/{subject_id}/schedule/{schedule_id}/schedule-details"
-    data = await fetch_data(session, url, headers=headers)
-    content = []
-
-    if data and data.get("success") and data.get("data"):
-        data_item = data["data"]
-        if content_type in ("videos", "DppVideos"):
-            video_details = data_item.get('videoDetails', {})
-            if video_details:
-                name = data_item.get('topic', 'Unknown')
-                videoUrl = video_details.get('videoUrl') or video_details.get('embedCode')
-                if videoUrl:
-                    content.append(f"{name}:{videoUrl}")
-        
-        elif content_type in ("notes", "DppNotes"):
-            homework_ids = data_item.get('homeworkIds', [])
-            for homework in homework_ids:
-                name = homework.get('topic', 'Unknown')
-                for attachment in homework.get('attachmentIds', []):
-                    url = attachment.get('baseUrl', '') + attachment.get('key', '')
-                    if url:
-                        content.append(f"{name}:{url}")
-    
-    return {content_type: content} if content else {}
-
-async def fetch_pwwp_all_schedule(session, chapter_id, batch_id, subject_id, content_type, headers):
-    all_schedule = []
-    page = 1
-    while True:
-        params = {'tag': chapter_id, 'contentType': content_type, 'page': page}
-        url = f"https://api.penpencil.co/v2/batches/{batch_id}/subject/{subject_id}/contents"
-        data = await fetch_data(session, url, headers=headers, params=params)
-        
-        if data and data.get("success") and data.get("data"):
-            for item in data["data"]:
-                item['content_type'] = content_type
-                all_schedule.append(item)
-            page += 1
-        else:
-            break
-    return all_schedule
-
-async def process_pwwp_chapters(session, chapter_id, batch_id, subject_id, headers):
-    content_types = ['videos', 'notes', 'DppNotes', 'DppVideos']
-    tasks = [fetch_pwwp_all_schedule(session, chapter_id, batch_id, subject_id, ct, headers) for ct in content_types]
-    results = await asyncio.gather(*tasks)
-    
-    all_schedule = []
-    for res in results:
-        all_schedule.extend(res)
-
-    content_tasks = [
-        process_pwwp_chapter_content(session, chapter_id, batch_id, subject_id, item["_id"], item['content_type'], headers)
-        for item in all_schedule
-    ]
-    content_results = await asyncio.gather(*content_tasks)
-    
-    combined = {}
-    for result in content_results:
-        if result:
-            for c_type, c_list in result.items():
-                if c_type not in combined: combined[c_type] = []
-                combined[c_type].extend(c_list)
-    return combined
-
 async def process_pwwp_subject(session, subject, batch_id, batch_name, zipf, json_data, all_subject_urls, headers):
     subject_name = subject.get("subject", "Unknown").replace("/", "-")
     subject_id = subject.get("_id")
+    
+    # Initialize JSON structure if not exists
+    if batch_name not in json_data:
+        json_data[batch_name] = {}
     json_data[batch_name][subject_name] = {}
+    
     zipf.writestr(f"{subject_name}/", "")
 
     # Get Chapters
@@ -169,32 +110,68 @@ async def process_pwwp_subject(session, subject, batch_id, batch_name, zipf, jso
         else:
             break
     
-    chapter_tasks = []
+    # Process Chapters
     for chapter in all_chapters:
         c_name = chapter.get("name", "Unknown").replace("/", "-")
         zipf.writestr(f"{subject_name}/{c_name}/", "")
         json_data[batch_name][subject_name][c_name] = {}
-        chapter_tasks.append(process_pwwp_chapters(session, chapter["_id"], batch_id, subject_id, headers))
-    
-    chapter_contents = await asyncio.gather(*chapter_tasks)
-    
-    subject_urls = []
-    for chapter, content in zip(all_chapters, chapter_contents):
-        c_name = chapter.get("name", "Unknown").replace("/", "-")
-        for c_type in ['videos', 'notes', 'DppNotes', 'DppVideos']:
-            if content.get(c_type):
-                items = content[c_type][::-1] # Reverse
-                zipf.writestr(f"{subject_name}/{c_name}/{c_type}.txt", "\n".join(items))
-                json_data[batch_name][subject_name][c_name][c_type] = items
-                subject_urls.extend(items)
-    
-    all_subject_urls[subject_name] = subject_urls
+        
+        # Process Content Types for each chapter
+        content_types = ['videos', 'notes', 'DppNotes', 'DppVideos']
+        
+        for c_type in content_types:
+            # Fetch content items
+            items = []
+            pg = 1
+            while True:
+                p_params = {'tag': chapter["_id"], 'contentType': c_type, 'page': pg}
+                p_url = f"https://api.penpencil.co/v2/batches/{batch_id}/subject/{subject_id}/contents"
+                p_data = await fetch_data(session, p_url, headers=headers, params=p_params)
+                
+                if p_data and p_data.get("success") and p_data.get("data"):
+                    items.extend(p_data["data"])
+                    pg += 1
+                else:
+                    break
+            
+            # Extract URLs from items
+            extracted_links = []
+            for item in items:
+                # Get detailed schedule info
+                s_url = f"https://api.penpencil.co/v1/batches/{batch_id}/subject/{subject_id}/schedule/{item['_id']}/schedule-details"
+                s_data = await fetch_data(session, s_url, headers=headers)
+                
+                if s_data and s_data.get("data"):
+                    d = s_data["data"]
+                    if c_type in ["videos", "DppVideos"]:
+                        vd = d.get('videoDetails', {})
+                        if vd:
+                            v_url = vd.get('videoUrl') or vd.get('embedCode')
+                            if v_url:
+                                extracted_links.append(f"{d.get('topic')}:{v_url}")
+                    else:
+                        h_ids = d.get('homeworkIds', [])
+                        for h in h_ids:
+                            for att in h.get('attachmentIds', []):
+                                url = att.get('baseUrl', '') + att.get('key', '')
+                                if url:
+                                    extracted_links.append(f"{h.get('topic')}:{url}")
 
-async def run_pwwp_extraction(bot: Client, m: Message, user_id: int):
+            if extracted_links:
+                final_text = "\n".join(extracted_links[::-1]) # Reverse order
+                zipf.writestr(f"{subject_name}/{c_name}/{c_type}.txt", final_text)
+                json_data[batch_name][subject_name][c_name][c_type] = extracted_links
+                
+                # Add to all urls list
+                if subject_name not in all_subject_urls:
+                    all_subject_urls[subject_name] = []
+                all_subject_urls[subject_name].extend(extracted_links)
+
+async def run_pwwp_extraction(client: Client, m: Message, user_id: int):
     editable = await m.reply_text("**Enter Access Token OR Phone Number:**")
     
     try:
-        input1 = await bot.listen(chat_id=m.chat.id, user_id=user_id, timeout=120)
+        input1 = await client.listen(chat_id=m.chat.id, user_id=user_id, timeout=120)
         raw_input = input1.text
         await input1.delete()
     except Exception:
@@ -216,7 +193,7 @@ async def run_pwwp_extraction(bot: Client, m: Message, user_id: int):
                 await session.post("https://api.penpencil.co/v1/users/get-otp?smsType=0", 
                                  json={"username": raw_input, "countryCode": "+91", "organizationId": "5eb393ee95fab7468a79d189"}, headers=headers)
                 await editable.edit("**Enter OTP:**")
-                input_otp = await bot.listen(chat_id=m.chat.id, user_id=user_id, timeout=120)
+                input_otp = await client.listen(chat_id=m.chat.id, user_id=user_id, timeout=120)
                 otp = input_otp.text
                 await input_otp.delete()
                 
@@ -240,7 +217,7 @@ async def run_pwwp_extraction(bot: Client, m: Message, user_id: int):
         # Batch Selection
         await editable.edit("**Enter Batch Name to Search:**")
         try:
-            batch_input = await bot.listen(chat_id=m.chat.id, user_id=user_id, timeout=120)
+            batch_input = await client.listen(chat_id=m.chat.id, user_id=user_id, timeout=120)
             batch_search = batch_input.text
             await batch_input.delete()
         except:
@@ -258,9 +235,10 @@ async def run_pwwp_extraction(bot: Client, m: Message, user_id: int):
         await editable.edit(f"**Select Batch Index:**\n\n{course_text}")
         
         try:
-            idx_input = await bot.listen(chat_id=m.chat.id, user_id=user_id, timeout=120)
+            idx_input = await client.listen(chat_id=m.chat.id, user_id=user_id, timeout=120)
             idx = int(idx_input.text) - 1
             await idx_input.delete()
+            if idx < 0 or idx >= len(courses): raise ValueError
             selected_course = courses[idx]
         except:
             await editable.edit("**Invalid Selection.**")
@@ -287,7 +265,10 @@ async def run_pwwp_extraction(bot: Client, m: Message, user_id: int):
             
             # Send Files
             await editable.delete()
-            await m.reply_document(document=f"{clean_name}.zip", caption=f"**{batch_name}**")
+            if os.path.exists(f"{clean_name}.zip"):
+                await m.reply_document(document=f"{clean_name}.zip", caption=f"**{batch_name}**")
+            else:
+                await m.reply_text("**Extraction finished but zip file was not created (Maybe empty batch?).**")
             
         except Exception as e:
             logger.error(e)
@@ -321,13 +302,8 @@ async def get_cpwp_content_recursive(session, headers, batch_token, folder_id=0)
             url = content.get('url') or content.get('thumbnailUrl')
             name = content.get('name', 'Unknown')
             if url:
-                # Basic URL cleanup/formatting
                 if "media-cdn.classplusapp.com/tencent/" in url:
                     url = url.rsplit('/', 1)[0] + "/master.m3u8"
-                elif "jw-signed-url" in url:
-                    # Logic to fetch signed URL would go here (simplified for brevity)
-                    pass 
-                
                 results.append(f"{name}:{url}")
 
     if tasks:
@@ -337,10 +313,10 @@ async def get_cpwp_content_recursive(session, headers, batch_token, folder_id=0)
             
     return results
 
-async def run_cpwp_extraction(bot: Client, m: Message, user_id: int):
+async def run_cpwp_extraction(client: Client, m: Message, user_id: int):
     editable = await m.reply_text("**Enter Org Code:**")
     try:
-        inp = await bot.listen(chat_id=m.chat.id, user_id=user_id, timeout=120)
+        inp = await client.listen(chat_id=m.chat.id, user_id=user_id, timeout=120)
         org_code = inp.text.lower()
         await inp.delete()
     except:
@@ -348,7 +324,6 @@ async def run_cpwp_extraction(bot: Client, m: Message, user_id: int):
         return
 
     async with aiohttp.ClientSession() as session:
-        # Get Token from Org Store
         headers = {'User-Agent': 'Mozilla/5.0'}
         async with session.get(f"https://{org_code}.courses.store", headers=headers) as resp:
             text = await resp.text()
@@ -358,10 +333,9 @@ async def run_cpwp_extraction(bot: Client, m: Message, user_id: int):
                 return
             token = match.group(1)
 
-        # Search Courses
         await editable.edit("**Enter Batch Name to Search:**")
         try:
-            inp = await bot.listen(chat_id=m.chat.id, user_id=user_id, timeout=60)
+            inp = await client.listen(chat_id=m.chat.id, user_id=user_id, timeout=60)
             search_term = inp.text
             await inp.delete()
         except: return
@@ -385,8 +359,9 @@ async def run_cpwp_extraction(bot: Client, m: Message, user_id: int):
         await editable.edit(f"**Select Course:**\n\n{c_text}")
 
         try:
-            inp = await bot.listen(chat_id=m.chat.id, user_id=user_id, timeout=60)
+            inp = await client.listen(chat_id=m.chat.id, user_id=user_id, timeout=60)
             idx = int(inp.text) - 1
+            if idx < 0 or idx >= len(courses): raise ValueError
             selected = courses[idx]
             await inp.delete()
         except: return
@@ -400,7 +375,6 @@ async def run_cpwp_extraction(bot: Client, m: Message, user_id: int):
 
         await editable.edit(f"**Extracting {selected['name']}...**")
         
-        # Extract Content
         links = await get_cpwp_content_recursive(session, api_headers, batch_hash)
         
         if links:
@@ -417,26 +391,25 @@ async def run_cpwp_extraction(bot: Client, m: Message, user_id: int):
 # CALLBACK QUERY HANDLER
 # --------------------------------------------------
 @bot.on_callback_query()
-async def callback_handler(bot: Client, query):
+async def callback_handler(client, query):
     user_id = query.from_user.id
     data = query.data
     
-    if user_id not in AUTH_USERS:
+    if user_id not in auth_users:
         await query.answer("Not Authorized!", show_alert=True)
         return
 
     await query.answer()
     
     if data == "pwwp":
-        # CRITICAL FIX: Use create_task, NOT ThreadPool
-        asyncio.create_task(run_pwwp_extraction(bot, query.message, user_id))
+        asyncio.create_task(run_pwwp_extraction(client, query.message, user_id))
     elif data == "cpwp":
-        asyncio.create_task(run_cpwp_extraction(bot, query.message, user_id))
+        asyncio.create_task(run_cpwp_extraction(client, query.message, user_id))
 
 # --------------------------------------------------
 # MAIN ENTRY
 # --------------------------------------------------
 if __name__ == "__main__":
-    print("Bot Started...")
+    print("Bot Starting...")
     bot.run()
 
