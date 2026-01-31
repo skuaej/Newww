@@ -1,6 +1,4 @@
-Here is the correct config.py file.
-Make sure the variable names are in UPPERCASE (like API_ID) because the main.py I gave you imports them that way.
-📄 Create config.py
+
 # config.py
 
 # 1. Get these from https://my.telegram.org/apps
@@ -15,5 +13,4 @@ BOT_TOKEN = "8082844410:AAFZODw1qsuezPFuci2XkahQJ4m_rUBNh3g"
 
 # 3. List of User IDs allowed to use the bot
 # You can find your ID using @userinfobot
-AUTH_USERS = [8426246984, 6373737837]
-
+AUTH_USERS = [8426246984]
