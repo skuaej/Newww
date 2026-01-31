@@ -1,7 +1,4 @@
-It looks like you accidentally pasted my instructions (text like "Step 2: The Main Script...") inside your Python file. The computer thinks this text is code, which causes the crash.
-You must delete EVERYTHING in your main.py file and paste ONLY the code block below.
-Do not paste any text that is outside of the grey box.
-📄 Copy this into main.py
+
 import asyncio
 import aiohttp
 import json
@@ -412,4 +409,3 @@ async def callback_handler(client, query):
 if __name__ == "__main__":
     print("Bot Starting...")
     bot.run()
-
