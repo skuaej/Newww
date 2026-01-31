@@ -15,8 +15,16 @@ from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message
 from pyromod import listen
 
-# Import credentials from config.py
-from config import api_id, api_hash, bot_token, auth_users
+# --------------------------------------------------
+# FIX: IMPORT UPPERCASE VARIABLES
+# --------------------------------------------------
+from config import API_ID, API_HASH, BOT_TOKEN, AUTH_USERS
+
+# Map them to lowercase to keep logic consistent
+api_id = API_ID
+api_hash = API_HASH
+bot_token = BOT_TOKEN
+auth_users = AUTH_USERS
 
 # --------------------------------------------------
 # LOGGING SETUP
@@ -409,3 +417,4 @@ async def callback_handler(client, query):
 if __name__ == "__main__":
     print("Bot Starting...")
     bot.run()
+
