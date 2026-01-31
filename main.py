@@ -1,14 +1,4 @@
-This is a massive script (approx 500-700 lines of logic) that was severely malformed (indentation errors, duplicate imports, and logic flaws).
-I have refactored the entire code into a working, clean, and optimized version.
-🛠 Major Fixes Applied:
- * Fixed Indentation: The original code had flattened logic that would cause IndentationError. I have reconstructed the try/except/else blocks.
- * Removed ThreadPoolExecutor: You were using THREADPOOL.submit(asyncio.run, ...) which creates nested event loops and crashes the bot. I replaced it with asyncio.create_task, which is the correct way to handle background tasks in Pyrogram.
- * Type Safety: Fixed the api_id error by forcing it to be an integer.
- * Cleaned Imports: Removed duplicates and organized them.
- * File Management: Added better error handling to ensure downloaded files (.zip, .txt) are deleted even if the upload fails, preventing server storage from filling up.
-Step 1: Create config.py
-Create a file named config.py and put your credentials there. Do not put them in the main script.
-# config.py
+
 API_ID = 12345678        # Your API ID (Integer, no quotes)
 API_HASH = "your_hash"   # Your API Hash (String)
 BOT_TOKEN = "your_token" # Your Bot Token (String)
